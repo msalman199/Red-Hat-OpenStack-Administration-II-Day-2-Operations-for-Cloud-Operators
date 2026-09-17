@@ -1,0 +1,94 @@
+Lab 3: Managing Glance (Image Service)
+Objectives
+By the end of this lab, you will be able to:
+
+Upload and manage VM images using OpenStack Glance.
+Configure Glance for efficient image retrieval.
+Use cloud-init for automated first-boot configuration during instance launch.
+Prerequisites
+A working OpenStack environment with Glance service installed.
+Administrative access to the OpenStack CLI (openstack command).
+A base cloud image (e.g., CirrOS, Ubuntu Cloud, or CentOS Cloud).
+Basic familiarity with Linux command line and YAML syntax.
+Task 1: Upload Base Images to Glance
+Subtask 1.1: Download a Base Cloud Image
+Download a lightweight cloud image (e.g., CirrOS) for testing:
+wget https://download.cirros-cloud.net/0.6.1/cirros-0.6.1-x86_64-disk.img
+Expected Outcome: The image file (cirros-0.6.1-x86_64-disk.img) is downloaded.
+Subtask 1.2: Upload the Image to Glance
+Use the OpenStack CLI to upload the image:
+
+openstack image create "cirros-0.6.1" \
+  --file cirros-0.6.1-x86_64-disk.img \
+  --disk-format qcow2 \
+  --container-format bare \
+  --public
+--disk-format qcow2: Specifies the disk format.
+--container-format bare: Indicates no container format.
+--public: Makes the image available to all projects.
+Verify the upload:
+
+openstack image list
+Expected Outcome: The image appears in the list with status active.
+
+Troubleshooting Tip: If the upload fails, check disk space in Glance's storage backend (/var/lib/glance/images/).
+
+Task 2: Configure Glance for Image Management
+Subtask 2.1: Set Image Properties
+Add metadata to the image for better management:
+
+openstack image set \
+  --property os_distro=cirros \
+  --property os_version=0.6.1 \
+  cirros-0.6.1
+Verify properties:
+
+openstack image show cirros-0.6.1
+Expected Outcome: The output includes os_distro and os_version properties.
+
+Subtask 2.2: Enable Image Caching (Optional)
+Edit Glance configuration to enable caching (if supported):
+sudo vi /etc/glance/glance-api.conf
+Add/modify:
+[glance_store]
+default_store = file
+filesystem_store_datadir = /var/lib/glance/images/
+Restart the service:
+sudo systemctl restart openstack-glance-api
+Task 3: Use cloud-init for First-Boot Configuration
+Subtask 3.1: Create a cloud-init Configuration File
+Create a cloud-init.yaml file to set a password and SSH key:
+#cloud-config
+password: openshift123
+chpasswd: { expire: False }
+ssh_pwauth: True
+ssh_authorized_keys:
+  - ssh-rsa AAAAB3NzaC1yc2E... user@example.com
+Subtask 3.2: Launch an Instance with cloud-init
+Create an instance using the uploaded image and cloud-init:
+
+openstack server create \
+  --image cirros-0.6.1 \
+  --flavor m1.small \
+  --nic net-id=<NETWORK_ID> \
+  --user-data cloud-init.yaml \
+  cirros-instance
+Replace <NETWORK_ID> with your network’s ID.
+
+Verify the instance boots with the configured password/key:
+
+openstack console log show cirros-instance | grep -i "cloud-init"
+Expected Outcome: Logs show successful cloud-init execution.
+
+Conclusion
+In this lab, you:
+
+Uploaded a base image to Glance and configured its properties.
+Explored Glance’s image management capabilities.
+Automated instance configuration using cloud-init.
+Next Steps: Experiment with larger images (e.g., Ubuntu/CentOS) and advanced cloud-init modules (e.g., package installation, disk setup).
+
+Troubleshooting Appendix
+Image upload fails: Check Glance service logs (journalctl -u openstack-glance-api).
+cloud-init not working: Ensure the image supports cloud-init (most cloud images do).
+Missing network: Verify the network ID with openstack network list.
