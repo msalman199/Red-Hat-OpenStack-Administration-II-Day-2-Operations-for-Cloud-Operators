@@ -1,0 +1,134 @@
+Lab 4: Managing Nova (Compute Service)
+Objectives
+Install and configure Nova services in OpenStack
+Create and manage virtual machine instances
+Monitor and troubleshoot Nova compute nodes and service status
+Prerequisites
+OpenStack environment with Keystone (Identity) service installed
+Administrative access to the OpenStack controller node
+Basic Linux command line proficiency
+SSH access to compute nodes
+Python 3.x installed
+Lab Setup
+Before beginning, ensure:
+
+All OpenStack nodes have network connectivity
+Database service (MariaDB/MySQL) is running
+Message queue (RabbitMQ) is configured
+Sufficient compute resources available
+Task 1: Install and Configure Nova Services
+Subtask 1.1: Install Nova Components
+On the controller node:
+
+# Install Nova API and conductor services
+sudo apt install nova-api nova-conductor nova-novncproxy nova-scheduler -y
+
+# Install Nova compute on compute nodes
+sudo apt install nova-compute -y
+Verification:
+
+nova-status upgrade check
+Expected Output: Should show no critical errors in the configuration
+
+Subtask 1.2: Configure Nova
+Edit the Nova configuration file:
+
+sudo nano /etc/nova/nova.conf
+Add/Modify these sections:
+
+[DEFAULT]
+transport_url = rabbit://openstack:RABBIT_PASS@controller
+my_ip = MANAGEMENT_IP
+use_neutron = true
+firewall_driver = nova.virt.firewall.NoopFirewallDriver
+
+[api]
+auth_strategy = keystone
+
+[keystone_authtoken]
+www_authenticate_uri = http://controller:5000/
+auth_url = http://controller:5000/
+memcached_servers = controller:11211
+auth_type = password
+project_domain_name = Default
+user_domain_name = Default
+project_name = service
+username = nova
+password = NOVA_PASS
+
+[vnc]
+enabled = true
+server_listen = $my_ip
+server_proxyclient_address = $my_ip
+Restart services:
+
+sudo service nova-api restart
+sudo service nova-scheduler restart
+sudo service nova-conductor restart
+sudo service nova-novncproxy restart
+Task 2: Create and Manage Instances
+Subtask 2.1: Verify Compute Service
+openstack compute service list
+Expected Output: Should show all nova services with "up" status
+
+Subtask 2.2: Launch an Instance
+First, source your OpenStack credentials:
+source admin-openrc
+Create a test instance:
+openstack server create --image cirros --flavor m1.tiny --network demo-net --key-name mykey test-instance
+Monitoring creation:
+
+openstack server show test-instance
+Subtask 2.3: Instance Management
+Common operations:
+
+# List instances
+openstack server list
+
+# Reboot instance
+openstack server reboot test-instance
+
+# Resize instance
+openstack server resize --flavor m1.small test-instance
+
+# Delete instance
+openstack server delete test-instance
+Task 3: Monitor and Troubleshoot
+Subtask 3.1: Check Compute Service Status
+nova service-list
+Troubleshooting Tip: If any service shows as down, check logs:
+
+sudo tail -f /var/log/nova/nova-compute.log
+Subtask 3.2: Resource Utilization
+openstack hypervisor stats show
+openstack hypervisor list
+Subtask 3.3: Common Issues
+Instance not launching:
+
+Check quota limits: openstack quota show
+Verify network connectivity
+Check compute node resources: free -h, df -h
+Authentication errors:
+
+Re-validate keystone configuration
+Verify token expiration
+Conclusion
+In this lab, you have:
+
+Successfully installed and configured Nova compute services
+Created and managed OpenStack instances
+Monitored compute resources and troubleshooted common issues
+Validation:
+
+Verify all services are operational: openstack compute service list
+Confirm at least one instance is running: openstack server list
+Check hypervisor statistics: openstack hypervisor stats show
+Next Steps:
+
+Explore advanced Nova features like live migration
+Configure instance scheduling weights
+Set up instance auto-scaling
+Additional Resources
+OpenStack Nova Documentation
+OpenStack CLI Reference
+Nova Troubleshooting Guide
