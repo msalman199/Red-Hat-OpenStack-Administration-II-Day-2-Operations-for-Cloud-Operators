@@ -1,0 +1,101 @@
+Lab 5: Managing Neutron (Networking Service) in OpenStack
+Objectives
+By the end of this lab, you will be able to:
+
+Configure networks, subnets, and routers in OpenStack Neutron
+Set up security groups and floating IPs for tenant isolation and external connectivity
+Monitor and troubleshoot Neutron service status
+Prerequisites
+Access to an OpenStack cloud environment with admin privileges
+OpenStack CLI tools installed (python-openstackclient)
+Basic understanding of networking concepts (VLANs, subnets, routers)
+Familiarity with Linux command line
+Lab Setup
+Ensure you have sourced your OpenStack RC file:
+source ~/openrc.sh
+Verify connectivity:
+openstack network agent list
+Expected Output: A list of active Neutron agents should appear.
+
+Task 1: Configure Networks, Subnets, and Routers
+Subtask 1.1: Create a Tenant Network
+openstack network create --internal --provider-network-type vlan \
+--provider-physical-network physnet1 \
+--provider-segment 100 lab-network
+Explanation:
+
+--internal: Creates a network only accessible within the tenant
+provider-network-type: Specifies VLAN isolation
+physnet1: The physical network defined in neutron configuration
+Verification:
+
+openstack network show lab-network
+Subtask 1.2: Create a Subnet
+openstack subnet create --network lab-network \
+--subnet-range 192.168.100.0/24 \
+--gateway 192.168.100.1 \
+--dns-nameserver 8.8.8.8 lab-subnet
+Troubleshooting Tip: If you get DHCP errors, ensure the IP range doesn't conflict with existing networks.
+
+Subtask 1.3: Create a Router
+openstack router create lab-router
+openstack router add subnet lab-router lab-subnet
+Key Concept: Routers enable communication between different networks and provide NAT functionality.
+
+Task 2: Security Groups and Floating IPs
+Subtask 2.1: Configure Security Groups
+# Create security group
+openstack security group create lab-sg
+
+# Add SSH rule
+openstack security group rule create --proto tcp \
+--dst-port 22 --remote-ip 0.0.0.0/0 lab-sg
+
+# Add ICMP rule
+openstack security group rule create --proto icmp lab-sg
+Expected Outcome: These rules will allow SSH and ping traffic to instances.
+
+Subtask 2.2: Allocate Floating IP
+# Create floating IP
+openstack floating ip create public
+
+# Associate with instance (replace with actual instance ID)
+openstack server add floating ip instance-1 <FLOATING_IP>
+Monitoring: Verify association:
+
+openstack server show instance-1
+Task 3: Monitoring and Troubleshooting
+Subtask 3.1: Check Neutron Service Status
+openstack network agent list
+Healthy State Indicators:
+
+alive column should show :-)
+All required agents (dhcp, l3, metadata) should be present
+Subtask 3.2: Common Troubleshooting Commands
+# Check network namespace
+ip netns list
+
+# Debug DHCP issues
+openstack port list --network lab-network
+Troubleshooting Flow:
+
+Verify agent status
+Check network connectivity between components
+Review OpenStack and Neutron logs (/var/log/neutron)
+Conclusion
+In this lab, you have:
+
+Created isolated tenant networks with proper subnet configuration
+Implemented security policies through security groups
+Enabled external connectivity using floating IPs
+Monitored and troubleshooted Neutron services
+Final Verification:
+
+openstack network list
+openstack subnet list
+openstack router list
+openstack security group list
+Additional Resources
+OpenStack Neutron Documentation
+OpenStack CLI Reference
+Neutron Troubleshooting Guide
