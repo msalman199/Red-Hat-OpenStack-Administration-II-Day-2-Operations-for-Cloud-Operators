@@ -1,0 +1,107 @@
+Lab 6: Managing Cinder (Block Storage Service)
+Objectives
+Understand Cinder's role in OpenStack's block storage service
+Learn to create, attach, and manage Cinder volumes
+Configure volume types and storage backends
+Monitor and troubleshoot Cinder services
+Prerequisites
+OpenStack environment with Cinder service installed
+CLI access with OpenStack client tools (openstack, cinder)
+Existing Nova instance for volume attachment
+Admin privileges for backend configuration
+Basic Linux command line knowledge
+Lab Setup
+SSH into your OpenStack controller node:
+ssh username@controller
+Source your OpenStack RC file:
+source admin-openrc.sh
+Task 1: Configure and Attach Cinder Volumes
+Subtask 1.1: Create a Volume
+List available volume types:
+
+openstack volume type list
+Expected Output: Shows available volume types (e.g., lvm, nfs)
+
+Create a 1GB volume:
+
+openstack volume create --size 1 --type lvm lab-volume
+Key Concept: Volumes are created in GB increments and tied to a storage backend
+
+Verify volume status:
+
+openstack volume show lab-volume | grep status
+Troubleshooting: If status stays 'creating', check cinder-scheduler logs
+
+Subtask 1.2: Attach to Instance
+List running instances:
+
+openstack server list
+Attach volume to instance:
+
+openstack server add volume <instance-id> lab-volume
+Verify attachment:
+
+openstack volume show lab-volume -c attachments
+Task 2: Manage Volume Types and Backends
+Subtask 2.1: Create Custom Volume Type
+Create new volume type:
+
+openstack volume type create fast-ssd --description "High performance SSD"
+Set extra specs (example for LVM backend):
+
+openstack volume type set fast-ssd \
+  --property volume_backend_name=lvmBackend \
+  --property replication_enabled='<is> False'
+Subtask 2.2: Configure Storage Backend
+Edit Cinder config (as admin):
+
+sudo vi /etc/cinder/cinder.conf
+Add backend configuration (example for LVM):
+
+[lvm]
+volume_driver = cinder.volume.drivers.lvm.LVMVolumeDriver
+volume_group = cinder-volumes
+iscsi_protocol = iscsi
+iscsi_helper = lioadm
+Restart services:
+
+sudo systemctl restart cinder-volume
+Task 3: Monitor and Troubleshoot
+Subtask 3.1: Service Status Check
+List Cinder services:
+
+openstack volume service list
+Expected Outcome: All services should show 'up' state
+
+Check specific service:
+
+sudo systemctl status cinder-scheduler
+Subtask 3.2: Log Analysis
+View Cinder logs:
+
+sudo tail -f /var/log/cinder/cinder-volume.log
+Common error resolution:
+
+# If volume fails to create:
+sudo cinder reset-state --state available <volume-id>
+Conclusion
+In this lab you have:
+
+Successfully created and attached Cinder volumes to instances
+Configured custom volume types and storage backends
+Monitored Cinder services and performed basic troubleshooting
+Verification
+Validate volume operations:
+
+openstack volume list
+openstack volume show <volume-id>
+Confirm backend configuration:
+
+openstack volume type list --long
+Cleanup
+Detach and delete volumes:
+openstack server remove volume <instance-id> lab-volume
+openstack volume delete lab-volume
+Additional Resources
+OpenStack Cinder Documentation
+Cinder CLI Reference
