@@ -1,0 +1,102 @@
+Lab 1: Control Plane Overview and Service Introduction
+Objectives
+Understand the architecture and components of OpenStack's control plane
+Identify key services and their responsibilities in OpenStack
+Examine service interdependencies between Keystone, Nova, and Neutron
+Analyze service communication patterns and management
+Prerequisites
+Basic Linux command line proficiency
+OpenStack deployment (DevStack or all-in-one installation recommended)
+SSH access to OpenStack controller node
+Python 3.x installed
+OpenStack CLI tools (openstack, nova, neutron commands)
+Lab Environment Setup
+DevStack Installation (if not already available):
+git clone https://opendev.org/openstack/devstack
+cd devstack
+./stack.sh
+Verify Installation:
+source ~/devstack/openrc admin admin
+openstack service list
+Lab Tasks
+Task 1: Identify Key Control Plane Services
+Subtask 1.1: List OpenStack Services
+openstack service list --long
+Expected Output:
+
++----------------------------------+-----------+------------------+---------+---------+-----------+
+| ID                               | Name      | Type             | Enabled | State   | Description |
++----------------------------------+-----------+------------------+---------+---------+-----------+
+| 03d80ab240a8456d8dee6674b7d7e7d1 | nova      | compute          | True    | up      | Nova Compute Service |
+| 1753438f3908430d8de6e6d920fa6f1a | neutron   | network          | True    | up      | Neutron Networking Service |
+| 2d7a9a1a3b1b4b5d9e6f7c8d9e0f1a2b | keystone  | identity         | True    | up      | OpenStack Identity |
+| ...                              | ...       | ...              | ...     | ...     | ...       |
++----------------------------------+-----------+------------------+---------+---------+-----------+
+Key Observations:
+
+Keystone provides identity services
+Nova manages compute resources
+Neutron handles networking
+Subtask 1.2: Verify Service Endpoints
+openstack endpoint list
+Troubleshooting Tip: If endpoints are missing, recreate them using:
+
+openstack endpoint create --region RegionOne <service> public http://<controller>:<port>
+Task 2: Understand Service Interdependencies
+Subtask 2.1: Keystone Authentication Flow
+Get authentication token:
+openstack token issue
+Examine token contents:
+import jwt
+token = "your_token_here"
+decoded = jwt.decode(token, options={"verify_signature": False})
+print(decoded)
+Key Concept: Services validate tokens with Keystone before processing requests.
+
+Subtask 2.2: Nova-Keystone Integration
+Check Nova service catalog:
+nova-manage api_db list
+Verify Nova is using Keystone:
+grep auth_strategy /etc/nova/nova.conf
+Expected Output: auth_strategy = keystone
+
+Subtask 2.3: Neutron-Keystone Integration
+Check Neutron configuration:
+grep auth /etc/neutron/neutron.conf
+Test Neutron API access:
+neutron agent-list
+Task 3: Service Communication Analysis
+Subtask 3.1: Examine Message Queue (RabbitMQ)
+sudo rabbitmqctl list_queues
+sudo rabbitmqctl list_exchanges
+Key Concept: Services communicate asynchronously via AMQP.
+
+Subtask 3.2: Review API Interactions
+Trace Nova API call:
+nova list --debug
+Examine HTTP headers:
+curl -i -X GET http://<controller>:8774/v2.1/servers \
+  -H "X-Auth-Token: $(openstack token issue -c id -f value)"
+Subtask 3.3: Service Health Checks
+systemctl list-units --type=service | grep -E 'nova|neutron|keystone'
+Conclusion
+Key Takeaways
+OpenStack's control plane consists of multiple interconnected services
+Keystone serves as the central authentication and service catalog
+Services communicate via REST APIs and message queues
+Proper configuration of service endpoints is critical for operation
+Verification
+Create a test resource to validate all services:
+openstack network create test_net
+openstack server create --image cirros --flavor m1.tiny --network test_net test_instance
+Verify resource creation:
+openstack server list
+openstack network list
+Cleanup
+openstack server delete test_instance
+openstack network delete test_net
+Additional Resources
+OpenStack Architecture
+Keystone Documentation
+Nova Documentation
+Neutron Documentation
