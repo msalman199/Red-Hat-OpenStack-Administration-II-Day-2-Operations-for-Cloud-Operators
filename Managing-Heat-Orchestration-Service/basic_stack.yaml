@@ -1,0 +1,10 @@
+heat_template_version: 2018-08-31
+description: A basic Heat template for lab
+
+resources:
+  test_server:
+    type: OS::Nova::Server
+    properties:
+      name: test-server
+      image: cirros
+      flavor: m1.tiny

@@ -1,0 +1,27 @@
+heat_template_version: 2018-08-31
+description: Auto-scaling setup
+
+parameters:
+  desired_capacity:
+    type: number
+    default: 2
+
+resources:
+  lb_pool:
+    type: OS::Neutron::Pool
+    properties:
+      name: HTTP
+      protocol: HTTP
+      method: ROUND_ROBIN
+
+  scaled_group:
+    type: OS::Heat::AutoScalingGroup
+    properties:
+      min_size: 1
+      max_size: 5
+      desired_capacity: { get_param: desired_capacity }
+      resource:
+        type: OS::Nova::Server
+        properties:
+          image: cirros
+          flavor: m1.tiny
