@@ -1,0 +1,89 @@
+Lab 18: Managing Token Keys
+Objectives
+Understand the importance of token key management in Keystone
+Implement key rotation policies for Keystone token keys
+Securely back up and synchronize token keys across controller nodes
+Use OpenStack commands to manage token keys effectively
+Prerequisites
+OpenStack environment with Keystone installed (minimum Queens release)
+Administrative access to the OpenStack controller nodes
+Basic understanding of OpenStack authentication mechanisms
+Familiarity with Linux command line and text editing (vim/nano)
+Lab Setup
+This lab requires:
+
+At least one OpenStack controller node
+Keystone service installed and configured
+Root or sudo privileges on the controller node(s)
+Task 1: Implement Key Rotation Policies
+Subtask 1.1: Understand Keystone Token Key Configuration
+Examine the current token provider configuration:
+sudo grep -i token /etc/keystone/keystone.conf
+Check the current token keys location:
+sudo ls -l /var/lib/keystone/fernet-keys/
+Expected Output:
+You should see numbered key files (0, 1) and possibly more depending on your configuration.
+
+Subtask 1.2: Configure Key Rotation Policy
+Open the Keystone configuration file:
+sudo vim /etc/keystone/keystone.conf
+Locate or add the [fernet_tokens] section and configure:
+[fernet_tokens]
+key_repository = /var/lib/keystone/fernet-keys
+max_active_keys = 3
+rotation_frequency = 86400
+Restart the Keystone service:
+sudo systemctl restart apache2
+Troubleshooting Tip:
+If you encounter errors, check logs with:
+
+sudo tail -f /var/log/keystone/keystone.log
+Task 2: Securely Back Up and Synchronize Token Keys
+Subtask 2.1: Create Key Backup
+Create a secure backup directory:
+sudo mkdir -p /secure-backup/keystone-keys
+sudo chmod 700 /secure-backup/keystone-keys
+Backup current keys:
+sudo cp -a /var/lib/keystone/fernet-keys/* /secure-backup/keystone-keys/
+Subtask 2.2: Synchronize Keys Across Controllers
+On the primary controller, package the keys:
+sudo tar czvf keystone-keys-backup.tar.gz /var/lib/keystone/fernet-keys/
+Securely transfer to secondary controllers (replace with your actual IPs):
+scp keystone-keys-backup.tar.gz root@controller2:/tmp/
+On secondary controllers, restore the keys:
+sudo tar xzvf /tmp/keystone-keys-backup.tar.gz -C /
+sudo chown -R keystone:keystone /var/lib/keystone/fernet-keys
+sudo systemctl restart apache2
+Security Note:
+Always use secure transfer methods (SCP/SFTP) and consider encrypting the backup.
+
+Task 3: Manage Token Keys Using OpenStack Commands
+Subtask 3.1: Rotate Keys Manually
+Rotate the Fernet keys:
+sudo keystone-manage fernet_rotate --keystone-user keystone --keystone-group keystone
+Verify the rotation:
+sudo ls -l /var/lib/keystone/fernet-keys/
+Expected Outcome:
+You should see a new key with the highest number (e.g., 2 if you previously had 0 and 1).
+
+Subtask 3.2: Validate Token Functionality
+Create a test token:
+openstack token issue
+Verify the token:
+openstack token validate <token_id>
+Troubleshooting Tip:
+If token validation fails, ensure all controllers have synchronized keys and services are restarted.
+
+Conclusion
+In this lab, you have:
+
+Configured and implemented Keystone token key rotation policies
+Established secure backup procedures for token keys
+Synchronized keys across multiple controller nodes
+Used OpenStack commands to manage and validate token keys
+Proper token key management is crucial for maintaining a secure OpenStack environment. Regular key rotation and secure key distribution help prevent authentication issues and maintain system security.
+
+Additional Resources
+OpenStack Keystone Fernet Tokens
+OpenStack Security Guide
+Red Hat OpenStack Platform Security Hardening
