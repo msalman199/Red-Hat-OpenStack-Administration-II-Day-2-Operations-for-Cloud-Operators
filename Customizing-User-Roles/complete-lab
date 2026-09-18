@@ -1,0 +1,95 @@
+Lab 19: Customizing User Roles in OpenStack
+Objectives
+By the end of this lab, you will be able to:
+
+Create and manage custom roles in OpenStack to reflect organizational policies.
+Assign permissions to roles by modifying service policy files.
+Map custom roles to users and groups for access control.
+Implement least privilege access based on job functions.
+Prerequisites
+A working OpenStack environment (e.g., DevStack, OpenStack-Ansible).
+Administrative access to the OpenStack CLI (openstack command).
+Basic familiarity with Linux command line and YAML syntax.
+Python installed for policy file editing.
+Lab Setup
+Access the OpenStack Controller Node
+SSH into your OpenStack controller node:
+
+ssh <username>@<controller-ip>
+Verify OpenStack CLI Access
+Ensure you can run OpenStack commands:
+
+openstack token issue
+Expected Outcome: A valid token with admin privileges is displayed.
+
+Task 1: Define Custom Roles and Assign Permissions
+Subtask 1.1: Create a Custom Role
+Create a custom role (e.g., auditor):
+
+openstack role create auditor
+Expected Outcome: Role auditor is created with a unique ID.
+
+List all roles to confirm:
+
+openstack role list
+Subtask 1.2: Modify Policy Files
+Locate the policy file for the desired service (e.g., Nova):
+
+sudo vi /etc/nova/policy.yaml
+Add a custom rule for the auditor role (e.g., read-only access to instances):
+
+"compute:get_all": "role:auditor or role:admin"
+Key Concept: Policy rules use a "rule": "role:xxx" syntax.
+
+Restart the Nova service to apply changes:
+
+sudo systemctl restart nova-api
+Task 2: Map Roles to Users and Groups
+Subtask 2.1: Assign Role to a User
+Assign the auditor role to a user (user1) in a project (project1):
+
+openstack role add --project project1 --user user1 auditor
+Verify the assignment:
+
+openstack role assignment list --user user1 --project project1
+Subtask 2.2: Assign Role to a Group
+Create a group (audit_team) and add users:
+
+openstack group create audit_team
+openstack group add user audit_team user1
+Assign the auditor role to the group:
+
+openstack role add --project project1 --group audit_team auditor
+Task 3: Implement Least Privilege Access
+Subtask 3.1: Restrict Permissions
+Edit the Keystone policy file to restrict admin privileges:
+
+sudo vi /etc/keystone/policy.json
+Modify rules to limit role creation to super-admins:
+
+"identity:create_role": "role:admin and system_scope:all"
+Subtask 3.2: Test Access Control
+As user1, attempt to list instances (allowed for auditor):
+
+openstack server list
+Attempt to create an instance (should fail):
+
+openstack server create --image cirros --flavor m1.tiny test-vm
+Troubleshooting Tip: If access is denied, verify the policy file syntax and role assignments.
+
+Conclusion
+In this lab, you:
+
+Created custom roles (auditor) and assigned granular permissions via policy files.
+Mapped roles to users/groups to enforce access control.
+Implemented least privilege principles by restricting permissions based on job functions.
+Next Steps
+Extend this to other OpenStack services (e.g., Neutron, Cinder).
+Explore role-based access control (RBAC) for multi-tenancy.
+Cleanup (Optional)
+Remove the auditor role:
+
+openstack role delete auditor
+Additional Resources
+OpenStack Policy Documentation
+Red Hat OpenShift RBAC Guide
