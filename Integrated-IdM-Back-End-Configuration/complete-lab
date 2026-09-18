@@ -1,0 +1,129 @@
+Lab 15: Integrated IdM Back-End Configuration
+Objectives
+Integrate Red Hat Identity Management (IdM) or LDAP as an authentication backend for Keystone
+Synchronize users, groups, and roles between IdM/LDAP and Keystone
+Implement password policies and user lifecycle management
+Prerequisites
+Red Hat Enterprise Linux 8/9 or CentOS Stream 8/9 system
+Administrative access to the system (root or sudo privileges)
+Red Hat Identity Management (IdM) server already configured
+OpenStack environment with Keystone installed
+Basic understanding of LDAP concepts
+Network connectivity between Keystone and IdM servers
+Lab Setup
+Before beginning, ensure the following packages are installed:
+
+sudo dnf install -y openstack-keystone python3-ldappool python3-ldap
+Task 1: Configure Keystone for IdM/LDAP Integration
+Subtask 1.1: Configure LDAP Backend in Keystone
+Edit the Keystone configuration file:
+sudo vi /etc/keystone/keystone.conf
+Add or modify the following sections:
+[identity]
+driver = ldap
+
+[ldap]
+url = ldap://idm.example.com
+user = uid=admin,cn=users,cn=accounts,dc=example,dc=com
+password = IdMAdminPassword
+suffix = cn=accounts,dc=example,dc=com
+user_tree_dn = cn=users,cn=accounts,dc=example,dc=com
+user_objectclass = person
+user_id_attribute = uid
+user_name_attribute = uid
+user_mail_attribute = mail
+user_pass_attribute = userPassword
+group_tree_dn = cn=groups,cn=accounts,dc=example,dc=com
+group_objectclass = groupOfNames
+group_id_attribute = cn
+group_name_attribute = cn
+group_member_attribute = member
+user_allow_create = False
+user_allow_update = False
+user_allow_delete = False
+group_allow_create = False
+group_allow_update = False
+group_allow_delete = False
+Restart the Keystone service:
+sudo systemctl restart openstack-keystone
+Expected Outcome: Keystone should now be able to communicate with the IdM server using LDAP.
+
+Troubleshooting Tip: If connection fails, verify:
+
+LDAP URL is correct
+Firewall allows LDAP traffic (port 389)
+Credentials are correct
+TLS certificates are trusted if using LDAPS
+Task 2: Synchronize Users, Groups, and Roles
+Subtask 2.1: Map LDAP Groups to Keystone Roles
+Create a mapping file for roles:
+sudo vi /etc/keystone/domains/keystone.idm.conf
+Add role mapping configuration:
+[identity]
+driver = ldap
+
+[ldap]
+# Previous LDAP configuration remains
+
+[role_mapping]
+admin = admins
+member = users
+reader = guests
+Apply the configuration:
+sudo keystone-manage mapping_populate --domain idm
+Expected Outcome: LDAP groups should now be mapped to corresponding Keystone roles.
+
+Subtask 2.2: Verify Synchronization
+List users from IdM in Keystone:
+openstack user list --domain idm
+List groups and their role assignments:
+openstack role assignment list --names
+Expected Outcome: You should see users and groups from IdM appearing in Keystone with proper role assignments.
+
+Task 3: Implement Password Policies and User Lifecycle Management
+Subtask 3.1: Configure Password Policies in IdM
+On the IdM server, set password policy:
+sudo ipa pwpolicy-mod --maxlife=90 --minlife=1 --history=5 --minclasses=4 --minlength=12 --maxfail=3 --failinterval=5 --lockouttime=300
+Expected Outcome: Password policy will enforce:
+
+90-day maximum password age
+12-character minimum length
+4 character classes required
+3 failed attempts lock account for 5 minutes
+Subtask 3.2: Configure Keystone for Password Policy Enforcement
+Edit Keystone configuration:
+sudo vi /etc/keystone/policy.json
+Add password policy enforcement rules:
+{
+    "identity:change_password": "rule:admin_required or user_id:%(target.user.id)s",
+    "identity:enforce_password_policy": "rule:admin_required"
+}
+Restart Keystone:
+sudo systemctl restart openstack-keystone
+Subtask 3.3: Test User Lifecycle
+Create a test user in IdM:
+sudo ipa user-add testuser --first=Test --last=User --password
+Verify the user appears in Keystone:
+openstack user show testuser --domain idm
+Disable the user in IdM:
+sudo ipa user-disable testuser
+Verify access is blocked in Keystone:
+openstack token issue --os-username testuser --os-password Password123
+Expected Outcome: The disabled user should not be able to authenticate with Keystone.
+
+Conclusion
+In this lab, you have successfully:
+
+Integrated Red Hat Identity Management (IdM) as an external authentication backend for Keystone
+Synchronized users, groups, and roles between IdM and Keystone
+Implemented password policies and user lifecycle management
+The integration allows OpenStack to leverage existing enterprise identity management systems, providing:
+
+Centralized user management
+Consistent security policies
+Simplified user experience
+Better compliance with organizational security requirements
+Additional Resources
+Red Hat Identity Management Documentation
+OpenStack Keystone LDAP Integration
+LDAP Schema Mapping Reference
