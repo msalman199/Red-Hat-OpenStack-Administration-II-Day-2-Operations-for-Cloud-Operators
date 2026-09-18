@@ -1,0 +1,146 @@
+Time Spent Today:
+1h 54m
+
+Start Lab
+✅ Connected
+Delete Lab
+SSH Access
+
+Video
+Lab Material
+Lab 14: Manage File-Based Component Security with AIDE
+Objectives
+Install and configure AIDE (Advanced Intrusion Detection Environment) to monitor OpenStack configuration files
+Schedule regular integrity checks using cron
+Configure automated alerts for unauthorized file changes
+Key Concepts: File integrity monitoring, security hardening, intrusion detection
+Prerequisites
+A Linux system (RHEL/CentOS 8/9 or Ubuntu 20.04/22.04) with:
+Minimum 2GB RAM
+20GB disk space
+Root/sudo privileges
+Basic OpenStack components installed (if testing on actual OpenStack environment)
+Working internet connection for package installation
+Task 1: Install and Configure AIDE
+Subtask 1.1: Install AIDE Package
+# For RHEL/CentOS:
+sudo dnf install aide -y
+
+# For Ubuntu:
+sudo apt install aide -y
+Verification:
+
+aide -v
+Expected Output: Should display AIDE version information
+
+Troubleshooting:
+
+If package not found, enable EPEL repository (RHEL/CentOS):
+sudo dnf install epel-release -y
+Subtask 1.2: Initialize AIDE Database
+sudo aide --init
+sudo mv /var/lib/aide/aide.db.new.gz /var/lib/aide/aide.db.gz
+Explanation:
+
+--init creates a new database of file checksums and attributes
+The database is moved to the active location for future comparisons
+Subtask 1.3: Configure AIDE for OpenStack Files
+Edit the configuration file:
+
+sudo nano /etc/aide.conf
+Add these OpenStack-specific rules:
+
+# OpenStack specific directories
+/etc/nova       p+i+n+u+g+s+b+m+c+sha512
+/etc/neutron    p+i+n+u+g+s+b+m+c+sha512
+/etc/keystone   p+i+n+u+g+s+b+m+c+sha512
+/etc/glance     p+i+n+u+g+s+b+m+c+sha512
+/etc/cinder     p+i+n+u+g+s+b+m+c+sha512
+Key Options:
+
+p: permissions
+i: inode
+n: number of links
+u: user
+g: group
+s: size
+b: block count
+m: mtime
+c: ctime
+sha512: checksum algorithm
+Verification:
+
+sudo aide --check
+Expected Outcome: Initial check should show "AIDE found NO differences"
+
+Task 2: Schedule Regular Integrity Checks
+Subtask 2.1: Create Daily Check Script
+sudo nano /usr/local/bin/aide_check.sh
+Add content:
+
+#!/bin/bash
+OUTPUT=$(aide --check 2>&1)
+if echo "$OUTPUT" | grep -q "AIDE found differences"; then
+    echo "$OUTPUT" | mail -s "AIDE Alert: Unauthorized Changes Detected" admin@yourdomain.com
+    logger -p auth.warn "AIDE: Unauthorized file changes detected"
+fi
+Make executable:
+
+sudo chmod +x /usr/local/bin/aide_check.sh
+Subtask 2.2: Schedule with Cron
+sudo crontab -e
+Add line:
+
+0 2 * * * /usr/local/bin/aide_check.sh
+Explanation: Runs daily at 2 AM
+
+Verification:
+
+sudo crontab -l
+Task 3: Configure Automated Alerts
+Subtask 3.1: Install Mail Utilities
+# RHEL/CentOS:
+sudo dnf install mailx postfix -y
+
+# Ubuntu:
+sudo apt install mailutils -y
+Subtask 3.2: Test Alert System
+Make a test change:
+sudo touch /etc/nova/test_change
+Run manual check:
+sudo /usr/local/bin/aide_check.sh
+Check mail queue:
+mailq
+Expected Outcome: You should receive an email alert about the change
+
+Subtask 3.3: Update Database After Verified Changes
+sudo aide --update
+sudo mv /var/lib/aide/aide.db.new.gz /var/lib/aide/aide.db.gz
+Conclusion
+Summary of Achievements:
+
+Successfully installed and configured AIDE for OpenStack security monitoring
+Implemented scheduled integrity checks using cron
+Established an automated alert system for unauthorized changes
+Key Takeaways:
+
+AIDE provides critical file integrity monitoring for security-sensitive environments
+Regular checks help detect potential intrusions or misconfigurations
+Automated alerts enable rapid response to security incidents
+Next Steps:
+
+Consider integrating with centralized logging solutions (ELK stack)
+Expand monitoring to include application binaries
+Implement version control for configuration files
+Verification Checklist:
+
+ AIDE database initialized
+ OpenStack directories included in configuration
+ Cron job created for daily checks
+ Test alert received successfully
+ Database updated after authorized changes
+Troubleshooting Tips:
+
+If emails aren't received, check Postfix/Sendmail configuration
+For false positives, verify file permissions and update the database
+Increase verbosity with aide --check --verbose for debugging
