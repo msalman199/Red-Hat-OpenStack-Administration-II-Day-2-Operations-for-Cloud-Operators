@@ -1,0 +1,126 @@
+Lab 10: Backup and Restore Control Plane
+Objectives
+Learn how to back up and restore key control plane components for disaster recovery.
+Understand the importance of securing configuration files and testing restore procedures.
+Prerequisites
+A running OpenShift or Kubernetes cluster (Minikube, Kind, or OpenShift Local).
+Administrative access to the cluster (kubectl or oc).
+Basic knowledge of Linux commands.
+etcdctl installed (for etcd backup/restore).
+jq (for JSON processing).
+Task 1: Back Up Databases and Message Queues
+Subtask 1.1: Back Up etcd (Key-Value Store for Kubernetes)
+Objective: Create a snapshot of the etcd database.
+
+Access the etcd pod:
+
+kubectl get pods -n kube-system | grep etcd
+kubectl exec -it -n kube-system <etcd-pod-name> -- sh
+Take an etcd snapshot:
+
+ETCDCTL_API=3 etcdctl --endpoints=https://127.0.0.1:2379 \
+--cacert=/etc/kubernetes/pki/etcd/ca.crt \
+--cert=/etc/kubernetes/pki/etcd/server.crt \
+--key=/etc/kubernetes/pki/etcd/server.key \
+snapshot save /var/lib/etcd/snapshot.db
+Verify the snapshot:
+
+ETCDCTL_API=3 etcdctl --write-out=table snapshot status /var/lib/etcd/snapshot.db
+Copy the snapshot to a secure location:
+
+kubectl cp -n kube-system <etcd-pod-name>:/var/lib/etcd/snapshot.db ~/backup/etcd-snapshot.db
+Expected Outcome:
+
+A snapshot of etcd is saved and verified.
+Troubleshooting:
+
+If etcdctl is not found, install it using:
+sudo apt-get install etcd-client
+Subtask 1.2: Back Up OpenShift/Kubernetes Message Queues (Kafka/RabbitMQ if used)
+Objective: Back up message queue data if the cluster uses Kafka or RabbitMQ.
+
+Check if Kafka/RabbitMQ is running:
+
+kubectl get pods -n <namespace> | grep -E "kafka|rabbitmq"
+Back up Kafka topics (if applicable):
+
+kubectl exec -it <kafka-pod> -- /opt/kafka/bin/kafka-topics.sh --list --bootstrap-server localhost:9092 > ~/backup/kafka-topics.txt
+Back up RabbitMQ definitions (if applicable):
+
+kubectl exec -it <rabbitmq-pod> -- rabbitmqadmin export ~/backup/rabbitmq-definitions.json
+Expected Outcome:
+
+A backup of message queue configurations is stored.
+Task 2: Store and Secure Configuration Files
+Subtask 2.1: Back Up Kubernetes/OpenShift Configuration Files
+Objective: Secure critical configuration files.
+
+Back up kubeconfig and cluster manifests:
+
+cp ~/.kube/config ~/backup/kubeconfig-backup
+kubectl get all --all-namespaces -o yaml > ~/backup/cluster-state.yaml
+Back up Persistent Volume (PV) and StorageClass definitions:
+
+kubectl get pv,pvc,sc -A -o yaml > ~/backup/storage-backup.yaml
+Encrypt the backup files (Optional but recommended):
+
+tar -czvf backup.tar.gz ~/backup/
+gpg --output backup.tar.gz.gpg --encrypt --recipient <your-email> backup.tar.gz
+Expected Outcome:
+
+Critical configuration files are backed up and optionally encrypted.
+Task 3: Test Restore Procedures and Validate Functionality
+Subtask 3.1: Restore etcd from Snapshot
+Objective: Validate the etcd restore process.
+
+Stop the kube-apiserver:
+
+sudo systemctl stop kube-apiserver
+Restore etcd from snapshot:
+
+ETCDCTL_API=3 etcdctl --endpoints=https://127.0.0.1:2379 \
+--cacert=/etc/kubernetes/pki/etcd/ca.crt \
+--cert=/etc/kubernetes/pki/etcd/server.crt \
+--key=/etc/kubernetes/pki/etcd/server.key \
+snapshot restore /var/lib/etcd/snapshot.db --data-dir=/var/lib/etcd/restored
+Update etcd configuration to point to the restored data:
+
+sudo vim /etc/kubernetes/manifests/etcd.yaml
+Modify --data-dir to /var/lib/etcd/restored.
+Restart kube-apiserver:
+
+sudo systemctl start kube-apiserver
+Expected Outcome:
+
+The cluster should come back online with the restored state.
+Troubleshooting:
+
+If the API server fails to start, check logs:
+journalctl -u kube-apiserver -f
+Subtask 3.2: Validate Cluster Functionality Post-Restore
+Objective: Ensure the restored cluster is functional.
+
+Check cluster status:
+
+kubectl get nodes
+kubectl get pods -A
+Test a sample application:
+
+kubectl create deployment nginx --image=nginx
+kubectl expose deployment nginx --port=80
+kubectl get svc nginx
+Expected Outcome:
+
+The cluster should respond normally, and applications should run as expected.
+Conclusion
+Successfully backed up etcd, message queues, and configuration files.
+Tested and validated the restore process.
+Learned best practices for disaster recovery in Kubernetes/OpenShift.
+Next Steps:
+
+Automate backups using CronJobs.
+Explore Velero for advanced backup/restore operations.
+Final Check:
+
+Ensure all backups are stored securely (encrypted, offsite).
+Document the restore process for team reference.
