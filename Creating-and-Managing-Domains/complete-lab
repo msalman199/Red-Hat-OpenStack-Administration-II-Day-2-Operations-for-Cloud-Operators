@@ -1,0 +1,103 @@
+Lab 17: Creating and Managing Domains in OpenStack
+Objectives
+Understand OpenStack Keystone domain concepts
+Create and configure domains for multi-tenancy
+Assign domain administrators and roles
+Implement resource isolation between domains
+Prerequisites
+OpenStack environment with admin privileges
+Keystone identity service installed
+OpenStack CLI tools installed (python-openstackclient)
+Basic understanding of OpenStack concepts
+Lab Setup
+Ensure you have admin credentials loaded:
+source admin-openrc.sh
+Verify connectivity:
+openstack token issue
+Task 1: Creating and Configuring Domains
+Subtask 1.1: Create New Domains
+# Create two new domains
+openstack domain create --description "Engineering Department" engineering
+openstack domain create --description "Marketing Department" marketing
+Expected Output:
+
++-------------+----------------------------------+
+| Field       | Value                            |
++-------------+----------------------------------+
+| description | Engineering Department           |
+| enabled     | True                             |
+| id          | 03e0870dc8a944a1a286a1d704a03d5c |
+| name        | engineering                      |
+| options     | {}                               |
+| tags        | []                               |
++-------------+----------------------------------+
+Subtask 1.2: List and Verify Domains
+openstack domain list
+Troubleshooting Tip: If domains don't appearing, ensure you have admin privileges by checking your admin-openrc.sh file contains proper credentials.
+
+Task 2: Assigning Administrators and Roles
+Subtask 2.1: Create Domain-Specific Users
+# Create users for each domain
+openstack user create --domain engineering --password EngPass123 eng_admin
+openstack user create --domain marketing --password MktPass123 mkt_admin
+Subtask 2.2: Assign Admin Roles
+# Get the admin role ID
+ADMIN_ROLE_ID=$(openstack role show admin -c id -f value)
+
+# Assign admin role to domain users
+openstack role add --domain engineering --user eng_admin $ADMIN_ROLE_ID
+openstack role add --domain marketing --user mkt_admin $ADMIN_ROLE_ID
+Verification:
+
+openstack role assignment list --user eng_admin --domain engineering
+openstack role assignment list --user mkt_admin --domain marketing
+Task 3: Isolating Resources Between Domains
+Subtask 3.1: Create Domain-Specific Projects
+openstack project create --domain engineering eng_project
+openstack project create --domain marketing mkt_project
+Subtask 3.2: Verify Resource Isolation
+# As engineering admin
+unset OS_PROJECT_NAME OS_PROJECT_DOMAIN_NAME
+export OS_USERNAME=eng_admin
+export OS_PASSWORD=EngPass123
+export OS_USER_DOMAIN_NAME=engineering
+export OS_PROJECT_NAME=eng_project
+export OS_PROJECT_DOMAIN_NAME=engineering
+
+# Try to list projects (should only see eng_project)
+openstack project list
+Expected Behavior: The engineering admin should only see projects within their domain.
+
+Subtask 3.3: Cross-Domain Access Test
+# Attempt to access marketing project (should fail)
+openstack project show mkt_project
+Expected Error: HTTP 403 Forbidden - demonstrating proper isolation
+
+Conclusion
+In this lab, you have:
+
+Successfully created and configured multiple domains in OpenStack Keystone
+Established domain-specific administrators with appropriate roles
+Demonstrated resource isolation between domains
+Key Concepts Reinforced:
+
+Domains provide the highest level of organizational isolation in OpenStack
+Role assignments can be scoped to specific domains
+Multi-tenancy is achieved through domain and project hierarchy
+Cleanup (Optional)
+# Switch back to admin credentials
+source admin-openrc.sh
+
+# Remove resources
+openstack user delete eng_admin mkt_admin
+openstack project delete eng_project mkt_project
+openstack domain delete engineering marketing
+Additional Exercises
+Create a read-only role and assign it to domain users
+Configure domain-specific quotas
+Experiment with domain-specific service catalogs
+Troubleshooting Guide
+Issue	Solution
+Permission denied errors	Verify role assignments and scope
+Domain not found	Check domain name spelling and case sensitivity
+Authentication failures	Confirm user passwords and domain assignments
