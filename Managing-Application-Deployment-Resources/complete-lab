@@ -1,0 +1,101 @@
+Lab 20: Managing Application Deployment Resources in OpenStack
+Objectives
+By the end of this lab, you will be able to:
+
+Upload and manage base/customized images in Glance (OpenStack Image Service).
+Define custom flavors to match specific workload requirements.
+Configure user data and metadata for instance initialization.
+Prerequisites
+Access to an OpenStack cloud environment with admin privileges.
+OpenStack CLI tools installed (openstack, glance, nova).
+Basic familiarity with command-line operations.
+A Linux-based base image (e.g., CirrOS, CentOS, or Ubuntu Cloud Image) for download.
+Task 1: Upload and Managing Images in Glance
+Subtask 1.1: Download a Base Image
+Download a base image (e.g., Ubuntu Cloud Image):
+wget https://cloud-images.ubuntu.com/focal/current/focal-server-cloudimg-amd64.img
+Subtask 1.2: Upload the Image to Glance
+Use the openstack CLI to upload the image:
+
+openstack image create "Ubuntu-20.04" \
+  --file focal-server-cloudimg-amd64.img \
+  --disk-format qcow2 \
+  --container-format bare \
+  --public
+--disk-format qcow2: Specifies the image format.
+--public: Makes the image available to all projects.
+Verify the upload:
+
+openstack image list
+Expected Outcome: The image "Ubuntu-20.04" appears in the list with status active.
+
+Subtask 1.3: Create a Customized Image
+Launch a temporary instance using the base image:
+
+openstack server create --image Ubuntu-20.04 --flavor m1.small temp-instance
+SSH into the instance, install required packages (e.g., nginx), and power it off:
+
+sudo apt update && sudo apt install -y nginx
+sudo poweroff
+Create a snapshot:
+
+openstack server image create --name "Ubuntu-20.04-NGINX" temp-instance
+Delete the temporary instance:
+
+openstack server delete temp-instance
+Task 2: Define Custom Flavors
+Subtask 2.1: List Existing Flavors
+View available flavors:
+openstack flavor list
+Subtask 2.2: Create a Custom Flavor
+Define a flavor for a memory-intensive workload:
+
+openstack flavor create \
+  --ram 8192 \
+  --disk 20 \
+  --vcpus 4 \
+  "mem-heavy"
+--ram 8192: 8GB RAM.
+--disk 20: 20GB disk space.
+--vcpus 4: 4 virtual CPUs.
+Verify:
+
+openstack flavor show mem-heavy
+Task 3: Configure User Data and Metadata
+Subtask 3.1: Launch an Instance with User Data
+Create a user-data.txt file for cloud-init:
+
+#!/bin/bash
+apt update
+apt install -y stress-ng
+Launch an instance with the user data:
+
+openstack server create \
+  --image Ubuntu-20.04 \
+  --flavor mem-heavy \
+  --user-data user-data.txt \
+  "stress-test-instance"
+Subtask 3.2: Attach Metadata
+Add metadata to the instance:
+
+openstack server set \
+  --property environment=production \
+  --property team=devops \
+  stress-test-instance
+Verify metadata:
+
+openstack server show stress-test-instance
+Troubleshooting Tips
+Image upload fails: Ensure the image file is not corrupted and the Glance service is running.
+Flavor creation denied: Check admin privileges are enabled.
+User data not executed: Verify cloud-init is installed in the base image.
+Conclusion
+In this lab, you:
+
+Uploaded and customized images in Glance.
+Created a custom flavor for memory-heavy workloads.
+Configured user data and metadata for instance initialization.
+These skills are essential for efficient application deployment in OpenStack environments.
+
+
+**Note**: All commands use modern OpenStack CLI syntax (Queens release or later) and avoid deprecated technologies. Adjust image names/flavors as per your OpenStack environment.
