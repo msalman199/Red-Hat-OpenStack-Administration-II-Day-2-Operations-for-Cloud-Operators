@@ -1,0 +1,179 @@
+Lab 7: Managing Heat (Orchestration Service)
+Objectives
+Understand OpenStack Heat orchestration service and its components
+Create and deploy Heat templates for multi-resource deployments
+Scale applications and services using Heat
+Monitor and troubleshoot Heat stack events and errors
+Prerequisites
+OpenStack environment with Heat service installed
+OpenStack CLI tools installed (openstack, heat)
+Basic understanding of YAML syntax
+Valid OpenStack credentials with orchestration permissions
+Access to a text editor (Vim, Nano, etc.)
+Lab Setup
+Environment Verification
+
+# Verify Heat service is available
+openstack orchestration service list
+
+# Check available Heat resources
+openstack orchestration resource type list
+Expected Output: Should display available Heat services and resource types without errors.
+
+Install Heat Client
+
+# For Ubuntu/Debian
+sudo apt-get install python3-heatclient
+
+# For CentOS/RHEL
+sudo yum install python3-heatclient
+Task 1: Create and Deploy Heat Templates
+Subtask 1.1: Basic Heat Template Creation
+Create a simple Heat template file (basic_stack.yaml):
+
+heat_template_version: 2018-08-31
+description: A basic Heat template for lab
+
+resources:
+  test_server:
+    type: OS::Nova::Server
+    properties:
+      name: test-server
+      image: cirros
+      flavor: m1.tiny
+Deploy the stack:
+
+openstack stack create -t basic_stack.yaml test-stack
+Verify stack creation:
+
+openstack stack list
+openstack server list
+Troubleshooting Tip: If stack fails, check events with:
+
+openstack stack event list test-stack
+Subtask 1.2: Multi-Resource Template
+Create an advanced template (multi_resource.yaml):
+
+heat_template_version: 2018-08-31
+description: Multi-resource deployment
+
+resources:
+  network:
+    type: OS::Neutron::Net
+    properties:
+      name: heat-network
+  
+  subnet:
+    type: OS::Neutron::Subnet
+    properties:
+      network: { get_resource: network }
+      cidr: 192.168.1.0/24
+      gateway_ip: 192.168.1.1
+  
+  server:
+    type: OS::Nova::Server
+    properties:
+      name: multi-resource-server
+      image: cirros
+      flavor: m1.tiny
+      networks:
+        - network: { get_resource: network }
+Deploy and verify:
+
+openstack stack create -t multi_resource.yaml advanced-stack
+openstack stack resource list advanced-stack
+Task 2: Scaling Applications with Heat
+Subtask 2.1: Auto-Scaling Configuration
+Create scaling template (scaling_stack.yaml):
+
+heat_template_version: 2018-08-31
+description: Auto-scaling setup
+
+parameters:
+  desired_capacity:
+    type: number
+    default: 2
+
+resources:
+  lb_pool:
+    type: OS::Neutron::Pool
+    properties:
+      name: HTTP
+      protocol: HTTP
+      method: ROUND_ROBIN
+
+  scaled_group:
+    type: OS::Heat::AutoScalingGroup
+    properties:
+      min_size: 1
+      max_size: 5
+      desired_capacity: { get_param: desired_capacity }
+      resource:
+        type: OS::Nova::Server
+        properties:
+          image: cirros
+          flavor: m1.tiny
+Deploy with scaling:
+
+openstack stack create -t scaling_stack.yaml scaling-stack \
+  --parameter desired_capacity=3
+Check scaling status:
+
+openstack stack resource show scaling-stack scaled_group
+Subtask 2.2: Manual Scaling
+Update stack with new capacity:
+
+openstack stack update scaling-stack -t scaling_stack.yaml \
+  --parameter desired_capacity=4
+Verify new instances:
+
+openstack server list
+Task 3: Troubleshooting Heat Stacks
+Subtask 3.1: Stack Event Analysis
+Check stack events:
+
+openstack stack event list scaling-stack
+View detailed error for failed resource:
+
+openstack stack event show scaling-stack <resource_name> <event_id>
+Subtask 3.2: Stack Debugging
+Get stack template:
+
+openstack stack template show scaling-stack
+Check resource health:
+
+openstack stack resource list scaling-stack --nested-depth 2
+Common troubleshooting commands:
+
+# View stack outputs
+openstack stack output list scaling-stack
+
+# Check Heat engine logs (on controller node)
+sudo tail -f /var/log/heat/heat-engine.log
+Conclusion
+In this lab, you have:
+
+Created and deployed basic and multi-resource Heat templates
+Implemented application scaling using Heat's auto-scaling capabilities
+Learned to monitor and troubleshoot Heat stack deployments
+Key Takeaways:
+
+Heat provides infrastructure-as-code capabilities in OpenStack
+Templates enable reproducible deployments
+Auto-scaling helps manage dynamic workloads
+Comprehensive logging aids in troubleshooting
+Next Steps:
+
+Explore Heat template functions and conditions
+Implement more complex multi-tier applications
+Integrate with OpenStack's telemetry service for metric-based scaling
+Cleanup:
+
+# Delete all stacks
+openstack stack delete test-stack
+openstack stack delete advanced-stack
+openstack stack delete scaling-stack
+Additional Resources
+OpenStack Heat Documentation
+Heat Template Guide
+OpenStack CLI Reference
