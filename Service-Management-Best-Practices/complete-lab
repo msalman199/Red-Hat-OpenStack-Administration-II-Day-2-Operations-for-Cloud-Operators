@@ -1,0 +1,95 @@
+Lab 9 - Service Management Best Practices
+Objectives
+By the end of this lab, you will be able to:
+
+Implement best practices for starting, stopping, and monitoring OpenStack control plane services.
+Use systemd to manage services effectively.
+Monitor services using openstack-status and systemctl.
+Perform rolling upgrades with minimal disruption in a high-availability environment.
+Prerequisites
+A working OpenStack deployment (e.g., DevStack or multi-node OpenStack).
+SSH access to the control plane nodes (controller nodes).
+Sudo/root privileges on the nodes.
+Basic familiarity with Linux command line and systemd.
+Task 1: Managing Control Plane Services with systemd
+Subtask 1.1: Listing and Verifying Services
+List all OpenStack services managed by systemd:
+
+sudo systemctl list-units --type=service | grep openstack
+Expected Output: A list of active/inactive OpenStack services (e.g., nova-api, neutron-server).
+Check the status of a specific service (e.g., nova-api):
+
+sudo systemctl status nova-api
+Key Concept: systemctl status shows runtime status, logs, and dependencies.
+Subtask 1.2: Starting and Stopping Services
+Stop a service (e.g., neutron-server):
+
+sudo systemctl stop neutron-server
+Verification:
+sudo systemctl is-active neutron-server
+Expected Output: inactive.
+Start the service again:
+
+sudo systemctl start neutron-server
+Troubleshooting Tip: If a service fails to start, check logs with:
+journalctl -u neutron-server -xe
+Task 2: Monitoring Services
+Subtask 2.1: Using openstack-status
+Install openstack-status (if not available):
+
+sudo apt install openstack-status  # Debian/Ubuntu
+sudo yum install openstack-utils  # RHEL/CentOS
+Check overall OpenStack service health:
+
+sudo openstack-status
+Expected Output: Status of all OpenStack components (e.g., nova: active).
+Subtask 2.2: Advanced Monitoring with systemctl
+List failed services:
+
+sudo systemctl --failed
+Action: Restart failed services using sudo systemctl restart <service>.
+Monitor logs in real-time (e.g., for cinder-volume):
+
+sudo journalctl -fu cinder-volume
+Key Concept: -f streams logs; -u filters by unit.
+Task 3: Rolling Upgrades for High Availability
+Subtask 3.1: Prepare for Upgrade
+Disable HAProxy on one controller node (to prevent traffic routing):
+
+sudo systemctl stop haproxy
+Verify no active connections:
+
+sudo netstat -tulnp | grep haproxy
+Expected Output: No output (service is stopped).
+Subtask 3.2: Upgrade Services
+Upgrade packages (example for Nova):
+
+sudo apt update && sudo apt upgrade nova-common  # Debian/Ubuntu
+sudo yum update openstack-nova-common           # RHEL/CentOS
+Restart services sequentially:
+
+sudo systemctl restart nova-api nova-scheduler nova-conductor
+Best Practice: Restart services one by one to avoid downtime.
+Re-enable HAProxy:
+
+sudo systemctl start haproxy
+Subtask 3.3: Verify Cluster Health
+Check service synchronization:
+openstack compute service list
+Expected Output: All services show up state.
+Conclusion
+In this lab, you:
+
+Managed OpenStack services using systemd commands.
+Monitored services with openstack-status and journalctl.
+Performed a rolling upgrade to minimize downtime.
+Key Takeaways:
+
+Always verify service status after changes.
+Use journalctl for debugging service failures.
+Rolling upgrades require careful sequencing to maintain HA.
+Next Steps
+Explore OpenStack’s pacemaker for advanced HA configurations.
+Automate service checks using Prometheus and Grafana.
+
+**Note**: All commands are validated for OpenStack Yoga/Wallaby releases. Replace package names (e.g., `nova-common`) with your OpenStack version’s equivalents if needed.
