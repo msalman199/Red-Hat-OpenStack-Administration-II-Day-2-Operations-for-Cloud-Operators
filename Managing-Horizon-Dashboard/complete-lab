@@ -1,0 +1,101 @@
+Lab Material
+Lab 8: Managing Horizon (Dashboard)
+Objectives
+Configure and manage the Horizon web interface for OpenStack users and administrators
+Implement secure access to OpenStack services through Horizon
+Manage user permissions and roles within Horizon
+Launch and manage instances and volumes using Horizon dashboard
+Prerequisites
+OpenStack environment with Horizon dashboard installed
+Admin credentials for OpenStack
+Basic understanding of OpenStack services
+Web browser with JavaScript enabled
+Terminal access to OpenStack controller node (for configuration tasks)
+Lab Tasks
+Task 1: Configure Horizon for Secure Access
+Subtask 1.1: Enable HTTPS for Horizon
+Connect to your OpenStack controller node via SSH:
+
+ssh username@controller-node
+Install the required packages:
+
+sudo apt-get install apache2 libapache2-mod-wsgi-py3
+Generate SSL certificates (or use existing ones):
+
+sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+-keyout /etc/ssl/private/horizon.key \
+-out /etc/ssl/certs/horizon.crt
+Configure Apache for HTTPS: Edit /etc/apache2/sites-available/horizon.conf:
+
+<VirtualHost *:443>
+    SSLEngine on
+    SSLCertificateFile /etc/ssl/certs/horizon.crt
+    SSLCertificateKeyFile /etc/ssl/private/horizon.key
+    WSGIScriptAlias / /usr/share/openstack-dashboard/openstack_dashboard/wsgi.py
+    <Directory /usr/share/openstack-dashboard/openstack_dashboard>
+        Require all granted
+    </Directory>
+</VirtualHost>
+Enable the configuration and restart Apache:
+
+sudo a2ensite horizon.conf
+sudo systemctl restart apache2
+Expected Outcome: Horizon dashboard should now be accessible via HTTPS at https://<controller-ip>
+
+Troubleshooting Tip: If you get SSL errors, try clearing your browser cache or adding a security exception.
+
+Task 2: Manage User Permissions and Roles
+Subtask 2.1: Create a New User
+Log in to Horizon as admin
+Navigate to Identity > Users
+Click Create User
+Fill in details:
+User Name: labuser
+Email: labuser@example.com
+Password: [set secure password]
+Primary Project: demo
+Role: _member_
+Subtask 2.2: Assign Project Roles
+Navigate to Identity > Projects
+Select the demo project
+Go to Project > Manage Members
+Add labuser with role member
+For admin privileges, add admin role
+Expected Outcome: New user can log in with assigned permissions
+
+Key Concept: OpenStack uses role-based access control (RBAC) to manage permissions
+
+Task 3: Instance and Volume Management
+Subtask 3.1: Launch an Instance
+Log in as labuser
+Navigate to Compute > Instances
+Click Launch Instance
+Configure:
+Instance Name: test-vm
+Source: Select an image (e.g., CirrOS)
+Flavor: m1.tiny
+Networks: Select available network
+Click Launch Instance
+Subtask 3.2: Create and Attach Volume
+Navigate to Volumes > Volumes
+Click Create Volume
+Name: test-vol
+Size: 1 GB
+Once created, select Manage Attachments
+Attach to test-vm
+Expected Outcome: Instance runs with attached storage volume
+
+Troubleshooting Tip: If instance fails to launch, check quota limits in Admin > Compute > Overview
+
+Conclusion
+In this lab, you have:
+
+Configured Horizon dashboard for secure HTTPS access
+Managed user permissions and role assignments
+Successfully launched an instance and attached storage volumes
+These skills are essential for OpenStack environments, particularly when preparing for Red Hat OpenShift certifications that build upon OpenStack knowledge.
+
+Additional Resources
+OpenStack Horizon Documentation
+OpenStack Security Guide
+RBAC in OpenStack
