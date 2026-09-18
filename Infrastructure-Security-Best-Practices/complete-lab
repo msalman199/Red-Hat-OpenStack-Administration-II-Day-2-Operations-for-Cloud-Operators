@@ -1,0 +1,117 @@
+Lab 12: Infrastructure Security Best Practices
+Objectives
+By the end of this lab, you will be able to:
+
+Implement network segmentation for management, storage, and tenant traffic in OpenStack.
+Configure firewalls and TLS encryption for secure inter-service communication.
+Set up multi-factor authentication (MFA) for admin access.
+Prerequisites
+A deployed OpenStack environment (e.g., DevStack or production-grade deployment).
+Administrative access to the OpenStack controller node.
+Basic familiarity with Linux commands and OpenStack CLI.
+openstack-client and python-openstackclient packages installed.
+A valid SSL/TLS certificate (self-signed or CA-signed) for encryption.
+Task 1: Implement Network Segmentation
+Subtask 1.1: Create Segregated Networks
+Objective: Separate management, storage, and tenant traffic into distinct networks.
+
+Create Management Network:
+
+openstack network create --provider-network-type flat --provider-physical-network physnet1 management
+openstack subnet create --network management --subnet-range 192.168.1.0/24 --gateway 192.168.1.1 management-subnet
+Create Storage Network:
+
+openstack network create --provider-network-type vlan --provider-physical-network physnet1 --provider-segment 101 storage
+openstack subnet create --network storage --subnet-range 10.0.1.0/24 --gateway 10.0.1.1 storage-subnet
+Create Tenant Network:
+
+openstack network create --provider-network-type vxlan tenant
+openstack subnet create --network tenant --subnet-range 172.16.0.0/24 --gateway 172.16.0.1 tenant-subnet
+Expected Outcome:
+Three isolated networks appear in openstack network list.
+
+Troubleshooting:
+
+Verify physical networks (physnet1) exist in openstack network agent list.
+Ensure VLAN/VXLAN is supported by the underlying infrastructure.
+Subtask 1.2: Apply Security Groups
+Objective: Restrict traffic flow between networks.
+
+Create Security Groups:
+
+openstack security group create management-sg --description "Management traffic only"
+openstack security group create storage-sg --description "Storage traffic only"
+Add Rules:
+
+# Allow SSH (port 22) and API traffic (port 5000) for management
+openstack security group rule create --proto tcp --dst-port 22 management-sg
+openstack security group rule create --proto tcp --dst-port 5000 management-sg
+
+# Allow NFS (port 2049) and iSCSI (port 3260) for storage
+openstack security group rule create --proto tcp --dst-port 2049 storage-sg
+openstack security group rule create --proto tcp --dst-port 3260 storage-sg
+Expected Outcome:
+Traffic is restricted to designated ports per network.
+
+Task 2: Configure Firewalls and TLS Encryption
+Subtask 2.1: Enable TLS for API Endpoints
+Objective: Encrypt communication between OpenStack services.
+
+Modify nova.conf:
+
+[ssl]
+enabled = true
+cert_file = /etc/ssl/certs/nova-cert.pem
+key_file = /etc/ssl/private/nova-key.pem
+ca_file = /etc/ssl/certs/ca.pem
+Restart Services:
+
+sudo systemctl restart nova-api
+Expected Outcome:
+curl -vk https://<controller-ip>:8774 shows TLS handshake success.
+
+Subtask 2.2: Configure Firewall (iptables)
+Objective: Harden the controller node.
+
+Allow Essential Ports:
+
+sudo iptables -A INPUT -p tcp --dport 22 -j ACCEPT    # SSH
+sudo iptables -A INPUT -p tcp --dport 443 -j ACCEPT   # HTTPS
+sudo iptables -A INPUT -j DROP                        # Deny all else
+Persist Rules:
+
+sudo apt install iptables-persistent
+sudo netfilter-persistent save
+Troubleshooting:
+Test connectivity before dropping traffic (iptables -L -v).
+
+Task 3: Set Up Multi-Factor Authentication
+Subtask 3.1: Install and Configure FreeOTP
+Objective: Enable MFA for OpenStack Dashboard (Horizon).
+
+Install libpam-google-authenticator:
+
+sudo apt install libpam-google-authenticator
+**Configure PAM**: Edit /etc/pam.d/sshd`:
+
+auth required pam_google_authenticator.so
+Enforce MFA in Horizon: Modify /etc/openstack-dashboard/local_settings.py:
+
+WEBSSO_ENABLED = True
+WEBSSO_CHOICES = [("mfa", "Multi-Factor Auth")]
+Expected Outcome:
+Admins must enter a OTP after password login.
+
+Conclusion
+In this lab, you:
+
+Segregated OpenStack networks for security.
+Enforced TLS encryption and firewall rules.
+Implemented MFA for administrative access.
+Validation:
+
+Verify network isolation: openstack network show <network-name>.
+Test TLS: openssl s_client -connect <controller-ip>:8774.
+Confirm MFA: Attempt dashboard login with OTP.
+Next Steps:
+Explore integrating LDAP for centralized authentication or auditing with OpenStack Telemetry (Ceilometer).
