@@ -1,0 +1,115 @@
+Lab 11: Start and Stop the Overcloud
+Objectives
+By the end of this lab, you will be able to:
+
+Manage the lifecycle of an OpenStack overcloud, including starting and stopping services.
+Perform graceful shutdowns and rolling restarts of overcloud nodes.
+Automate start/stop sequences using orchestration tools like Ansible.
+Prerequisites
+A deployed OpenStack overcloud (controller, compute, network, and storage nodes).
+SSH access to the undercloud node with stack user privileges.
+Basic familiarity with OpenStack CLI and Ansible.
+Installed openstack-client and ansible packages.
+Task 1: Start Overcloud Services
+Subtask 1.1: Verify Overcloud Status
+Before starting services, check the current state of the overcloud.
+
+source ~/stackrc  # Load undercloud environment
+openstack stack list  # Verify overcloud stack status
+openstack server list  # List all overcloud nodes
+Expected Outcome:
+
+The openstack stack list should show the overcloud stack as CREATE_COMPLETE or UPDATE_COMPLETE.
+openstack server list should display all nodes (controller, compute, etc.) with ACTIVE status.
+Subtask 1.2: Start All Overcloud Nodes
+If nodes are stopped, start them using the following commands:
+
+# Start controller nodes
+for node in $(openstack server list --name controller -f value -c ID); do
+    openstack server start $node
+done
+
+# Start compute nodes
+for node in $(openstack server list --name compute -f value -c ID); do
+    openstack server start $node
+done
+Expected Outcome:
+
+Nodes transition from SHUTOFF to ACTIVE status. Verify using:
+openstack server list
+Troubleshooting:
+
+If nodes fail to start, check hypervisor resources (e.g., RAM/CPU) with:
+openstack hypervisor stats show
+Task 2: Graceful Shutdown and Rolling Restarts
+Subtask 2.1: Graceful Shutdown of Services
+To avoid data corruption, gracefully shut down services on controller nodes:
+
+# SSH into a controller node
+ssh heat-admin@<controller-ip>
+
+# Stop all OpenStack services gracefully
+sudo systemctl stop 'openstack-*'
+sudo systemctl stop 'neutron-*'
+sudo systemctl stop 'httpd'
+Expected Outcome:
+
+Services stop without errors. Verify with:
+sudo systemctl list-units --all | grep openstack
+Subtask 2.2: Rolling Restart of Compute Nodes
+Minimize downtime by restarting compute nodes one at a time:
+
+# Disable a compute node
+openstack compute service set <hostname> nova-compute --disable
+
+# Restart the node
+openstack server reboot <compute-node-id> --soft  # Soft reboot (graceful)
+
+# Re-enable the node after restart
+openstack compute service set <hostname> nova-compute --enable
+Expected Outcome:
+
+Compute nodes restart without affecting running VMs (live migration if enabled).
+Task 3: Automate Start/Stop with Ansible
+Subtask 3.1: Create an Ansible Playbook
+Automate overcloud start/stop with an Ansible playbook (overcloud-management.yml):
+
+---
+- name: Manage Overcloud Lifecycle
+  hosts: localhost
+  tasks:
+    - name: Start all overcloud nodes
+      command: "openstack server start {{ item }}"
+      loop: "{{ lookup('pipe', 'openstack server list -f value -c ID') }}"
+      when: action == 'start'
+
+    - name: Stop all overcloud nodes
+      command: "openstack server stop {{ item }}"
+      loop: "{{ lookup('pipe', 'openstack server list -f value -c ID') }}"
+      when: action == 'stop'
+Subtask 3.2: Execute the Playbook
+Run the playbook to start/stop nodes:
+
+# Start all nodes
+ansible-playbook overcloud-management.yml -e "action=start"
+
+# Stop all nodes
+ansible-playbook overcloud-management.yml -e "action=stop"
+Expected Outcome:
+
+Playbook executes without errors, and nodes change state as specified.
+Conclusion
+In this lab, you:
+
+Started overcloud services and verified their status.
+Performed graceful shutdowns and rolling restarts to minimize downtime.
+Automated lifecycle management using Ansible.
+Key Takeaways:
+
+Always verify node status before making changes.
+Use rolling restarts for high-availability environments.
+Automation reduces human error in repetitive tasks.
+Next Steps:
+
+Explore OpenStack’s tripleo CLI for advanced overcloud operations.
+Implement monitoring (e.g., Prometheus) to track service health during restarts.

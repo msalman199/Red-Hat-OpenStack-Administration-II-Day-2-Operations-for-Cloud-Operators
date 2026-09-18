@@ -1,0 +1,13 @@
+---
+- name: Manage Overcloud Lifecycle
+  hosts: localhost
+  tasks:
+    - name: Start all overcloud nodes
+      command: "openstack server start {{ item }}"
+      loop: "{{ lookup('pipe', 'openstack server list -f value -c ID') }}"
+      when: action == 'start'
+
+    - name: Stop all overcloud nodes
+      command: "openstack server stop {{ item }}"
+      loop: "{{ lookup('pipe', 'openstack server list -f value -c ID') }}"
+      when: action == 'stop'
