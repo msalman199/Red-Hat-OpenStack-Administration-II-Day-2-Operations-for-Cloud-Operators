@@ -1,0 +1,104 @@
+Lab 16: Scoped Service Access Configuration
+Objectives
+Understand and implement scoped token authentication in OpenStack
+Configure role-based access control (RBAC) using Keystone policies
+Validate service access restrictions through scoped tokens
+Demonstrate domain and project-level access control
+Prerequisites
+OpenStack cloud environment (DevStack or production)
+OpenStack CLI tools installed (python-openstackclient)
+Admin credentials for Keystone
+Basic understanding of OpenStack identity concepts
+Access to a Linux terminal
+Setup Requirements
+Install OpenStack client:
+pip install python-openstackclient
+Source your OpenStack RC file:
+source admin-openrc.sh
+Task 1: Configure Scoped Tokens
+Subtask 1.1: Create Domain-Scoped Token
+List available domains:
+
+openstack domain list
+Expected Output: Table showing available domains
+
+Request domain-scoped token:
+
+openstack token issue --domain <domain_name>
+Explanation: This creates a token limited to operations within the specified domain
+
+Verify token scope:
+
+openstack token show <token_id> -c domain -c roles
+Troubleshooting: If denied, ensure your admin user has sufficient privileges
+
+Subtask 1.2: Create Project-Scoped Token
+List projects:
+
+openstack project list
+Request project-scoped token:
+
+openstack token issue --project <project_name>
+Test access:
+
+openstack server list
+Expected Outcome: Only shows instances within the scoped project
+
+Task 2: Implement Keystone Policies
+Subtask 2.1: Modify Policy.json
+Locate Keystone policy file:
+
+sudo vi /etc/keystone/policy.json
+Add custom rule (example):
+
+{
+  "identity:get_user": "role:admin or (role:user and domain_id:%(target.user.domain_id)s)"
+}
+Key Concept: This restricts user access to their own domain
+
+Apply changes:
+
+sudo systemctl restart apache2
+Subtask 2.2: Test Policy Enforcement
+As domain user, attempt to list all users:
+openstack user list
+Expected Outcome: Access denied for non-admin users
+Task 3: Validate Access Control
+Subtask 3.1: Role-Based Verification
+Create test role:
+
+openstack role create observer
+Assign role to user:
+
+openstack role add --user <user> --project <project> observer
+Test restricted access:
+
+openstack image create --disk-format qcow2 test_image
+Expected Outcome: Operation fails due to insufficient permissions
+
+Subtask 3.2: Cross-Domain Testing
+Attempt cross-domain operation with domain token:
+openstack user list --domain <other_domain>
+Expected Outcome: Access denied for foreign domain operations
+Conclusion
+This lab demonstrated:
+
+Successful implementation of domain and project-scoped tokens
+Configuration of granular access control through Keystone policies
+Validation of role-based restrictions across OpenStack services
+Key Takeaways:
+
+Scoped tokens provide security boundaries in multi-tenant environments
+Keystone policies enable fine-grained access control
+Proper testing is essential to verify access restrictions
+Next Steps
+Experiment with more complex policy combinations
+Explore federation scenarios with multiple domains
+Implement token expiration policies for enhanced security
+Troubleshooting Guide
+Issue	Solution
+Token creation fails	Verify admin credentials and endpoint URLs
+Policy changes not applied	Restart Apache/Keystone service
+Unexpected access granted	Check role assignments and policy precedence
+
+This lab provides a comprehensive, hands-on experience with OpenStack's access control mechanisms while maintaining alignment with open-source principles and current best practices.
