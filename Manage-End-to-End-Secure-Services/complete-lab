@@ -1,0 +1,120 @@
+Time Spent Today:
+1h 39m
+
+Start Lab
+✅ Connected
+Delete Lab
+SSH Access
+
+Video
+Lab Material
+Lab 13: Manage End-to-End Secure Services in OpenStack
+Objectives
+By the end of this lab, you will be able to:
+
+Implement mutual TLS (mTLS) for secure service-to-service authentication in OpenStack
+Configure Keystone tokens for secure API access
+Enforce Role-Based Access Control (RBAC) for permissions management
+Verify end-to-end security across OpenStack services
+Prerequisites
+Basic understanding of OpenStack architecture
+Access to an OpenStack deployment (DevStack or production)
+Admin privileges on the OpenStack environment
+OpenSSL installed on the controller node
+Familiarity with Linux command line
+Lab Setup
+Ensure all OpenStack services are running:
+sudo systemctl list-units | grep openstack
+Verify Keystone is operational:
+openstack token issue
+Task 1: Implement Mutual TLS for Service-to-Service Authentication
+Subtask 1.1: Generate Certificates
+Create a Certificate Authority (CA):
+openssl genrsa -out ca.key 4096
+openssl req -new -x509 -days 365 -key ca.key -out ca.crt
+Generate server certificates for each service (example for Nova):
+openssl genrsa -out nova.key 4096
+openssl req -new -key nova.key -out nova.csr
+openssl x509 -req -days 365 -in nova.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out nova.crt
+Subtask 1.2: Configure Services for mTLS
+Edit Nova configuration:
+sudo vi /etc/nova/nova.conf
+Add these lines under [DEFAULT]:
+
+ssl_cert_file = /etc/nova/ssl/nova.crt
+ssl_key_file = /etc/nova/ssl/nova.key
+ca_file = /etc/nova/ssl/ca.crt
+use_ssl = True
+Repeat for other services (Neutron, Cinder, etc.) with their respective certificates.
+Subtask 1.3: Verify mTLS Connection
+Test Nova API with curl:
+curl --cert nova.crt --key nova.key --cacert ca.crt https://<controller-ip>:8774/v2.1
+Expected Output: Should return Nova API information without SSL errors.
+
+Task 2: Use Keystone Tokens for Secure API Access
+Subtask 2.1: Configure Token Provider
+Edit Keystone configuration:
+sudo vi /etc/keystone/keystone.conf
+Ensure these settings:
+
+[token]
+provider = fernet
+expiration = 3600
+Initialize Fernet keys:
+sudo keystone-manage fernet_setup --keystone-user keystone --keystone-group keystone
+Subtask 2.2: Test Token Authentication
+Get a token:
+openstack token issue
+Expected Output: Should display token details including expiration time.
+
+Use token to access Nova API:
+curl -H "X-Auth-Token: <token>" http://<controller-ip>:8774/v2.1
+Task 3: Enforce Role-Based Access Control (RBAC)
+Subtask 3.1: Create Custom Roles
+Create a new role:
+openstack role create security_auditor
+Assign role to user:
+openstack role add --project admin --user admin security_auditor
+Subtask 3.2: Configure Policy Files
+Edit Nova policy file:
+sudo vi /etc/nova/policy.json
+Add custom rule:
+
+{
+    "context_is_admin": "role:admin or role:security_auditor",
+    "compute:get_all": "rule:context_is_admin"
+}
+Verify policy enforcement:
+openstack server list
+Expected Outcome: Only users with admin or security_auditor role should see all VMs.
+
+Verification and Testing
+Comprehensive security check:
+openstack security group list
+openstack network list
+Verify only authorized users can access these resources.
+
+Check service communication:
+sudo tail -f /var/log/nova/nova-api.log | grep SSL
+Should show successful TLS handshakes.
+
+Troubleshooting Tips
+SSL errors: Verify certificate paths and permissions
+Token failures: Check Fernet keys synchronization across nodes
+Permission denied: Verify policy.json syntax and role assignments
+Service communication issues: Check firewall rules for service ports
+Conclusion
+In this lab, you implemented end-to-end security for OpenStack services by:
+
+Establishing mutual TLS authentication between services
+Configuring secure token-based authentication with Keystone
+Enforcing granular access control through RBAC policies
+These measures significantly enhance the security posture of your OpenStack deployment by ensuring:
+
+Encrypted service communication
+Strong authentication mechanisms
+Least-privilege access control
+Next Steps
+Explore integrating with external certificate authorities
+Implement multi-factor authentication for Keystone
+Configure security compliance scanning tools for OpenStack
